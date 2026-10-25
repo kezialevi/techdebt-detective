@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Tech Debt Detective: a noir-themed code smell analyser. Paste your code, investigate the evidence, close the case." />
+  <title>Tech Debt Detective — Noir Code Analysis Bureau</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       AMBIENT OVERLAYS (film grain + vignette)
+       aria-hidden — purely decorative
+  ═══════════════════════════════════════════════ -->
+  <canvas id="grain" aria-hidden="true" focusable="false"></canvas>
+  <div    class="vignette"  aria-hidden="true"></div>
+  <div    class="scanlines" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       SKIP LINK — accessibility
+  ═══════════════════════════════════════════════ -->
+  <a href="#codeInput" class="skip-link">Skip to code editor</a>
+
+  <!-- ═══════════════════════════════════════════════
+       SITE HEADER
+  ═══════════════════════════════════════════════ -->
+  <header class="site-header" role="banner">
+    <div class="header-brand">
+      <!-- Magnifier SVG badge -->
+      <svg class="brand-icon" viewBox="0 0 40 40" width="38" height="38"
+           role="img" aria-label="Magnifying glass icon">
+        <circle cx="16" cy="16" r="11" fill="none"
+                stroke="var(--brass)" stroke-width="2.5"/>
+        <line x1="24" y1="24" x2="36" y2="36"
+              stroke="var(--brass)" stroke-width="3"
+              stroke-linecap="round"/>
+      </svg>
+      <div class="brand-text">
+        <span class="brand-title">TECH DEBT DETECTIVE</span>
+        <span class="brand-sub">
+          NOIR CODE ANALYSIS BUREAU
+          <span aria-hidden="true">&nbsp;·&nbsp;</span>
+          IBM AI BUILDERS CHALLENGE
+        </span>
+      </div>
+    </div>
+
+    <div class="header-status" role="status" aria-live="polite" aria-atomic="true">
+      <span class="case-num">CASE&nbsp;#<span id="caseNumber" aria-label="Case number">—</span></span>
+      <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+      <span class="status-text" id="statusText">AWAITING EVIDENCE</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN APP SHELL — three-column layout
+  ═══════════════════════════════════════════════ -->
+  <div class="app-shell">
+
+    <!-- ─────────────────────────────────────────
+         COLUMN 1: EVIDENCE INTAKE
+    ───────────────────────────────────────────── -->
+    <aside class="col col--intake" aria-label="Evidence intake">
+
+      <header class="col-header">
+        <h2 class="col-title">EVIDENCE INTAKE</h2>
+      </header>
+
+      <!-- Language selector -->
+      <div class="field-group">
+        <label class="field-label" for="langSelect">LANGUAGE</label>
+        <select id="langSelect" class="select-field"
+                aria-label="Select programming language">
+          <option value="javascript">JavaScript / Node</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="java">Java</option>
+          <option value="csharp">C#</option>
+          <option value="php">PHP</option>
+          <option value="go">Go</option>
+          <option value="ruby">Ruby</option>
+        </select>
+      </div>
+
+      <!-- Code evidence editor -->
+      <div class="field-group field-group--grow">
+        <label class="field-label" for="codeInput">CODE EVIDENCE</label>
+        <div class="editor-frame">
+          <div class="editor-gutter"
+               id="editorGutter"
+               aria-hidden="true"></div>
+          <textarea
+            id="codeInput"
+            class="code-editor"
+            spellcheck="false"
+            autocorrect="off"
+            autocapitalize="off"
+            aria-label="Code evidence editor — paste your code here"
+            aria-required="true"
+            aria-describedby="editorHint"
+            placeholder="// Paste your evidence here, kid.&#10;// Every line is a clue."
+          ></textarea>
+        </div>
+        <p id="editorHint" class="hint-text">
+          Ctrl+Enter to investigate &nbsp;·&nbsp; Tab inserts 2 spaces
+        </p>
+      </div>
+
+      <!-- Action toolbar -->
+      <div class="intake-toolbar" role="toolbar"
+           aria-label="Evidence editor actions">
+        <button class="btn btn--ghost btn--sm"
+                id="btnClear"
+                type="button"
+                aria-label="Clear the code editor">
+          CLEAR
+        </button>
+        <button class="btn btn--ghost btn--sm"
+                id="btnSample"
+                type="button"
+                aria-label="Load a deliberately messy sample snippet">
+          LOAD SAMPLE
+        </button>
+        <button class="btn btn--primary"
+                id="btnInvestigate"
+                type="button"
+                aria-label="Investigate the code for smells">
+          <!-- Inline magnifier icon -->
+          <svg viewBox="0 0 20 20" width="14" height="14"
+               aria-hidden="true" focusable="false">
+            <circle cx="8" cy="8" r="5" fill="none"
+                    stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="12" x2="18" y2="18"
+                  stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round"/>
+          </svg>
+          INVESTIGATE
+        </button>
+      </div>
+
+      <!-- Metrics strip (revealed after investigation) -->
+      <div class="metrics-strip" id="metricsStrip"
+           hidden aria-label="Investigation metrics">
+        <div class="metric-cell">
+          <span class="metric-val" id="mLoc"  aria-label="Lines of code">—</span>
+          <span class="metric-lbl">LINES</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-val" id="mSmells" aria-label="Number of smells">—</span>
+          <span class="metric-lbl">SMELLS</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-val" id="mScore"  aria-label="Debt score out of 100">—</span>
+          <span class="metric-lbl">DEBT SCORE</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-val" id="mVerdict" aria-label="Verdict">—</span>
+          <span class="metric-lbl">VERDICT</span>
+        </div>
+      </div>
+
+      <!-- Typewriter narration box -->
+      <div class="typewriter-box" id="typewriterBox" hidden
+           aria-live="polite" aria-atomic="false">
+        <p class="typewriter-text" id="typewriterText"></p>
+      </div>
+
+      <!-- Prime suspects (by category score) -->
+      <section class="suspects-section" id="suspectsSection"
+               hidden aria-label="Prime suspects ranked by debt score">
+        <header class="col-header col-header--nested">
+          <h3 class="col-title col-title--sm">PRIME SUSPECTS</h3>
+        </header>
+        <ol class="suspect-list" id="suspectList" aria-label="Suspect ranking"></ol>
+      </section>
+
+      <!-- Generate report CTA -->
+      <button class="btn btn--cta"
+              id="btnCloseCase"
+              type="button"
+              hidden
+              aria-label="Close the case and generate a printable report">
+        📋&nbsp; CLOSE THE CASE &amp; GENERATE REPORT
+      </button>
+
+    </aside><!-- /col--intake -->
+
+
+    <!-- ─────────────────────────────────────────
+         COLUMN 2: EVIDENCE BOARD (CORKBOARD)
+    ───────────────────────────────────────────── -->
+    <main class="col col--board" id="boardCol"
+          aria-label="Evidence board — draggable finding cards">
+
+      <!-- Idle placeholder -->
+      <div class="board-idle" id="boardIdle" aria-hidden="false">
+        <svg class="idle-illustration" viewBox="0 0 220 180"
+             role="img" aria-label="Empty corkboard illustration">
+          <rect width="220" height="180" fill="var(--cork)" rx="4"/>
+          <line x1="0" y1="45"  x2="220" y2="45"  stroke="var(--cork-line)" stroke-width="1"/>
+          <line x1="0" y1="90"  x2="220" y2="90"  stroke="var(--cork-line)" stroke-width="1"/>
+          <line x1="0" y1="135" x2="220" y2="135" stroke="var(--cork-line)" stroke-width="1"/>
+          <circle cx="110" cy="76" r="7" fill="var(--brass)" opacity=".35"/>
+          <rect   x="107" y="83" width="6" height="14"
+                  rx="2" fill="var(--brass)" opacity=".2"/>
+          <rect   x="65"  y="55" width="80" height="66"
+                  rx="2" fill="#1e1c18" stroke="#3e3a30"
+                  stroke-width="1" opacity=".55"/>
+          <rect   x="73"  y="95" width="64" height="4"
+                  rx="1" fill="#3e3a30" opacity=".4"/>
+          <rect   x="73"  y="103" width="44" height="4"
+                  rx="1" fill="#3e3a30" opacity=".25"/>
+        </svg>
+        <p class="idle-caption">
+          Submit evidence to open the case.<br>
+          Findings will appear on the board.
+        </p>
+      </div>
+
+      <!-- Live corkboard — cards injected by script.js -->
+      <div class="corkboard" id="corkboard"
+           hidden
+           aria-live="polite"
+           aria-relevant="additions">
+        <!-- SVG string layer sits behind cards -->
+        <svg class="string-svg" id="stringSvg"
+             aria-hidden="true" focusable="false"></svg>
+        <!-- .polaroid elements are appended here -->
+      </div>
+
+      <!-- Loading overlay -->
+      <div class="board-loading" id="boardLoading"
+           hidden role="status" aria-live="polite">
+        <div class="loading-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <p class="loading-caption" id="loadingCaption">
+          Lighting a cigarette…
+        </p>
+      </div>
+
+    </main><!-- /col--board -->
+
+
+    <!-- ─────────────────────────────────────────
+         COLUMN 3: FINDING DETAIL PANEL
+    ───────────────────────────────────────────── -->
+    <aside class="col col--detail" id="detailCol"
+           aria-label="Finding detail panel">
+
+      <header class="col-header">
+        <h2 class="col-title" id="detailColTitle">SELECT A FINDING</h2>
+        <button class="btn btn--icon"
+                id="btnDetailClose"
+                type="button"
+                hidden
+                aria-label="Close finding detail">
+          &#x2715;
+        </button>
+      </header>
+
+      <!-- Idle hint -->
+      <div class="detail-idle" id="detailIdle">
+        <p>Click any evidence card on the board to examine it in detail.</p>
+      </div>
+
+      <!-- Finding detail (revealed on card click) -->
+      <div class="detail-content" id="detailContent"
+           hidden aria-labelledby="detailSmell">
+
+        <!-- Severity stamp -->
+        <div class="detail-stamp" id="detailStamp"
+             aria-label="Severity stamp"></div>
+
+        <!-- Finding name -->
+        <h2 class="detail-name" id="detailSmell"></h2>
+
+        <!-- Meta row -->
+        <div class="detail-meta" role="list">
+          <span class="detail-lines" id="detailLines" role="listitem"></span>
+          <span class="detail-sev"   id="detailSev"   role="listitem"></span>
+        </div>
+
+        <!-- Noir one-liner -->
+        <blockquote class="detail-noir" id="detailNoir"></blockquote>
+
+        <!-- Code excerpt -->
+        <h3 class="detail-section-hd">CODE EXCERPT</h3>
+        <pre class="detail-code" id="detailCode"
+             tabindex="0" aria-label="Code excerpt"></pre>
+
+        <!-- Explanation -->
+        <h3 class="detail-section-hd">EXPLANATION</h3>
+        <p class="detail-explanation" id="detailExplanation"></p>
+
+        <!-- Suggested fix -->
+        <h3 class="detail-section-hd">SUGGESTED FIX</h3>
+        <pre class="detail-fix" id="detailFix"
+             tabindex="0" aria-label="Suggested fix"></pre>
+
+      </div><!-- /detail-content -->
+
+    </aside><!-- /col--detail -->
+
+  </div><!-- /app-shell -->
+
+
+  <!-- ═══════════════════════════════════════════════
+       CASE REPORT MODAL
+  ═══════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="reportModal"
+       hidden
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="modalHeading"
+       aria-describedby="modalDesc">
+
+    <div class="modal-box">
+
+      <!-- Modal toolbar (hidden from print) -->
+      <div class="modal-toolbar no-print" role="toolbar"
+           aria-label="Report actions">
+        <h2 class="modal-heading" id="modalHeading">OFFICIAL CASE REPORT</h2>
+        <p id="modalDesc" class="sr-only">
+          Printable case report. Use the Print button to save as PDF.
+        </p>
+        <div class="modal-actions">
+          <button class="btn btn--ghost btn--sm"
+                  id="btnPrint"
+                  type="button"
+                  aria-label="Print or save case report as PDF">
+            🖨&nbsp; PRINT / SAVE PDF
+          </button>
+          <button class="btn btn--icon"
+                  id="btnCloseModal"
+                  type="button"
+                  aria-label="Close case report">
+            &#x2715;
+          </button>
+        </div>
+      </div>
+
+      <!-- ── PRINTABLE REPORT AREA ── -->
+      <div class="report-area" id="reportArea">
+
+        <!-- Print-only first-page masthead: case number + date.
+             Hidden on screen; shown by @media print rules.        -->
+        <div class="rpt-print-masthead" aria-hidden="true">
+          <span class="rpt-pm-bureau">TECH DEBT DETECTIVE BUREAU</span>
+          <span class="rpt-pm-meta">
+            Case No.&nbsp;<span id="rpPrintCaseNo">—</span>
+            &nbsp;·&nbsp;
+            <span id="rpPrintDate">—</span>
+          </span>
+        </div>
+
+        <header class="rpt-header">
+          <div class="rpt-logo">
+            <svg viewBox="0 0 40 40" width="36" height="36"
+                 role="img" aria-label="Bureau logo">
+              <circle cx="16" cy="16" r="11" fill="none"
+                      stroke="#c9a24b" stroke-width="2.5"/>
+              <line x1="24" y1="24" x2="36" y2="36"
+                    stroke="#c9a24b" stroke-width="3"
+                    stroke-linecap="round"/>
+            </svg>
+            <div class="rpt-agency">
+              <strong class="rpt-name">TECH DEBT DETECTIVE BUREAU</strong>
+              <span class="rpt-sub">IBM AI Builders Challenge · IT Track</span>
+            </div>
+          </div>
+          <dl class="rpt-meta">
+            <dt>CASE NO.</dt>  <dd id="rpCaseNo">—</dd>
+            <dt>DATE</dt>      <dd id="rpDate">—</dd>
+            <dt>LANGUAGE</dt>  <dd id="rpLang">—</dd>
+            <dt>LINES</dt>     <dd id="rpLines">—</dd>
+          </dl>
+        </header>
+
+        <hr class="rpt-rule" />
+
+        <!-- Verdict banner -->
+        <div class="rpt-verdict" id="rpVerdictBanner"
+             role="status" aria-live="polite">
+          <span class="rpt-verdict-icon" id="rpVerdictIcon"
+                aria-hidden="true">⚖️</span>
+          <span class="rpt-verdict-label" id="rpVerdictLabel">VERDICT</span>
+          <span class="rpt-score">
+            DEBT SCORE:&nbsp;<strong id="rpScore">—</strong>/100
+          </span>
+        </div>
+
+        <!-- Findings table -->
+        <h2 class="rpt-section-hd">EVIDENCE SUMMARY</h2>
+        <table class="rpt-table" id="rpTable">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">SMELL</th>
+              <th scope="col">LINES</th>
+              <th scope="col">SEVERITY</th>
+              <th scope="col">SUGGESTED FIX (BRIEF)</th>
+            </tr>
+          </thead>
+          <tbody id="rpTableBody"></tbody>
+        </table>
+
+        <!-- Recommendations -->
+        <h2 class="rpt-section-hd">DETECTIVE'S RECOMMENDATIONS</h2>
+        <ul class="rpt-recs" id="rpRecs"></ul>
+
+        <!-- Report footer -->
+        <footer class="rpt-footer">
+          <p>
+            This report was generated automatically by Tech Debt Detective.
+            All findings are rule-based static analysis.
+            Apply professional judgement when implementing fixes.
+          </p>
+          <p class="rpt-signoff" id="rpSignOff"></p>
+        </footer>
+
+        <!-- Print-only signature line. Hidden on screen.          -->
+        <div class="rpt-signature" aria-hidden="true">
+          <div class="rpt-sig-line"></div>
+          <p class="rpt-sig-label">
+            Investigator Signature &amp; Badge No.
+          </p>
+          <p class="rpt-sig-close">— CASE CLOSED —</p>
+        </div>
+
+      </div><!-- /report-area -->
+
+    </div><!-- /modal-box -->
+  </div><!-- /modal-overlay -->
+
+
+  <!-- ═══════════════════════════════════════════════
+       SITE FOOTER
+  ═══════════════════════════════════════════════ -->
+  <footer class="site-footer" role="contentinfo">
+    <span>
+      TECH DEBT DETECTIVE &copy;&nbsp;<span id="yr"></span>
+      &nbsp;·&nbsp; IBM AI Builders Challenge
+      &nbsp;·&nbsp; IT Track
+      &nbsp;·&nbsp; Pure HTML5 / CSS3 / Vanilla JS
+    </span>
+  </footer>
+
+  <!-- script deferred — runs after DOM is ready -->
+  <script src="script.js" defer></script>
+
+</body>
+</html>
